@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+var canvas, ctx;
+var asteroidVertices = [];
+var asteroids = [];
+var spaceshipVertices = [];
+var spaceship;
+var bullets = [];
+var bulletVertices = [];
+var bulletReady = true;
+
+var tempAsteroid; //just so we do not overuse immutable types.
+
+function init() {
+	canvas = document.getElementById("canvas");
+	ctx = canvas.getContext("2d");	
+
+	asteroidVertices.push({x:-1, y:2});
+	asteroidVertices.push({x:3, y:1});
+	asteroidVertices.push({x:4, y:-2});
+	asteroidVertices.push({x:0, y:-3});
+	asteroidVertices.push({x:-3, y:-2});
+
+	spaceshipVertices.push({x:0, y:2});
+	spaceshipVertices.push({x:1, y:0});
+	spaceshipVertices.push({x:0, y:-1});
+	spaceshipVertices.push({x:-1, y:0});
+
+  bulletVertices.push({x:0, y:0});
+  bulletVertices.push({x:0, y:1});
+
+	setKeyHandlers();
+
+	spawnAsteroids();
+	spawnSpaceship();
+	gameLoop();
+}
+
+function setKeyHandlers() {
+	document.onkeydown = function(event) {
+		var code = (event.keyCode || event.charCode);
+		if (code==37) // left arrow
+			spaceship.drot = -0.2;
+		else if (code==39) // right arrow
+			spaceship.drot = 0.2;
+		else if (code==38) // up arrow
+			spaceship.thrust = true;
+    else if (code==32 && bulletReady){ // spacebar
+      bulletReady = false;
+			shootBullet();
+      window.setTimeout(() => {bulletReady=true;}, 150); //bullet cooldown in millis.
+    }
+	};
+
+	document.onkeyup = function(event) {
+		var code = (event.keyCode || event.charCode);
+		if (code==37 || code==39)
+			spaceship.drot = 0;
+		else if (code==38)
+			spaceship.thrust = false;
+	};
+}
+
+function spawnAsteroids() {
+	for (var i=0; i<1; i++) {
+		// var a = {
+    //   x:Math.random()*600,
+    //   y:Math.random()*600,
+    //   rot:Math.random()*2*Math.PI, 
+    //   scale:5+Math.random()*15, 
+    //   dx:(Math.random()-0.5)*10,
+    //   dy:(Math.random()-0.5)*10,
+    //   drot:(Math.random()-0.5)*0.2,
+    //   vertices:asteroidVertices,
+    //   parent:true
+    // };
+
+    //cheeky
+    var a = {
+      x:300,
+      y:390,
+      rot:0, 
+      scale:13, 
+      dx:0,
+      dy:0,
+      drot:0,
+      vertices:asteroidVertices,
+      parent:true
+    };
+    
+		asteroids.push(a);
+	}
+}
+
+function spawnSpaceship() {
+	spaceship = {x:300, y:300, rot:0, scale:10, dx:0, dy:0, drot:0, vertices:spaceshipVertices, thrust:false};
+}
+
+function gameLoop() {
+	window.setTimeout(gameLoop, 1000/30);
+
+	ctx.fillStyle = "rgb(190,190,190)";
+	ctx.fillRect (0, 0, 600, 600);
+
+  checkForCollisions();
+
+	for (var i=0; i<asteroids.length; i++) {
+		updateObject(asteroids[i]);	
+		drawObject(asteroids[i]);
+	}
+
+  for (var i=0; i<bullets.length; i++) {
+		updateObject(bullets[i]);	
+		drawObject(bullets[i]);
+	}
+
+	if (spaceship.thrust) {
+		spaceship.dx -= Math.sin(spaceship.rot);
+		spaceship.dy += Math.cos(spaceship.rot);
+	}
+	updateObject(spaceship);
+	drawObject(spaceship);
+}
+
+function updateObject(o) {
+	o.x += o.dx;
+	o.y += o.dy;
+	if (o.x<-20)
+		o.x += 640;
+	else if (o.x>620)
+		o.x -= 640;
+	if (o.y<-20)
+		o.y += 640;
+	else if (o.y>620)
+		o.y -= 640;
+	o.rot += o.drot;	
+}
+
+function drawObject(o) {
+	var pt = getTransformedVertex(o.vertices[0], o); 
+	ctx.beginPath();
+	ctx.moveTo(pt.x, pt.y);
+
+	for (var i=1; i<o.vertices.length; i++) {
+		var pt2 = getTransformedVertex(o.vertices[i], o); 
+		ctx.lineTo(pt2.x, pt2.y);
+	}
+
+	ctx.lineTo(pt.x, pt.y);
+
+	ctx.stroke();	
+}
+
+function getTransformedVertex(vertex, object) {
+	// rotate
+	var x = vertex.x * Math.cos(object.rot) - vertex.y * Math.sin(object.rot);
+	var y = vertex.x *  Math.sin(object.rot) + vertex.y * Math.cos(object.rot);
+	// scale
+	x *= object.scale;
+	y *= object.scale;
+	// translate
+	x += object.x;
+	y += object.y;
+
+	return {x:x, y:y};
+}
+
+//BEING MY CODE::
+
+function shootBullet() {
+  var spaceShipTip = getTransformedVertex(spaceship.vertices[0], spaceship)
+  bullet = {
+    x:spaceShipTip.x, 
+    y:spaceShipTip.y, 
+    rot:spaceship.rot, 
+    scale:10,
+    dx:Math.sin(spaceship.rot)*-3+spaceship.dx*.75, 
+    dy:Math.cos(spaceship.rot)*3+spaceship.dy*.75,
+    drot:0, 
+    vertices:bulletVertices
+  };
+  bullets.push(bullet);
+}
+
+function checkForCollisions(){
+  for(var index = 0; index < asteroids.length; index++) {
+    tempAsteroid = asteroids[index];
+    if(isCollision(spaceship, tempAsteroid)){
+      console.log("you died.");
+      // if(tempAsteroid.parent) {spawnFourAsteroids(tempAsteroid.x, tempAsteroid.y);}
+      // deleteAsteroid(index);
+    }
+  }
+}
+
+//using point-inside-polygon collision detection
+//if points is the right of all line segments because all asteroids are convex.
+//it is possible that the corner of an asteroid is colliding with the side of a spaceship between the corners. But that bug will maybe be only for a frame or two.
+
+//we will be checking each vertex of the spaceship against the sides of the asteroids.
+//This method
+function isCollision(spaceship, asteroid){
+  var isCollisionBool;
+
+  for(var shpVertIndex = 0; shpVertIndex < spaceshipVertices.length; shpVertIndex++){
+    var globalShpVert = getTransformedVertex(spaceship.vertices[shpVertIndex], spaceship);
+    isCollisionBool = true;
+
+    for(var astVertIndex = 0; astVertIndex < asteroidVertices.length; astVertIndex++){
+      //get global asteroid coordinates
+      var globalAstVert1 = getTransformedVertex(asteroid.vertices[astVertIndex], asteroid);
+      
+      if(astVertIndex==asteroidVertices.length-1){
+        var globalAstVert2 = getTransformedVertex(asteroid.vertices[0], asteroid);
+      }else{
+        var globalAstVert2 = getTransformedVertex(asteroid.vertices[astVertIndex+1], asteroid);
+      }
+      var pointCompToLine = ((globalShpVert.y - globalAstVert1.y)*(globalAstVert2.x - globalAstVert1.x))-((globalShpVert.x - globalAstVert1.x)*(globalAstVert2.y - globalAstVert1.y));
+      //if it is greater than 0 it is on the left.
+      if((pointCompToLine>0)){
+        isCollisionBool = false;
+      }
+    }
+    if(isCollisionBool){
+      return true;
+    }
+  }
+  return false;
+}
+
+
+
+
+
+function spawnFourAsteroids(parentX, parentY) {
+  //defining positive and negatives dx and dy to send an asteroid into each quadrant.
+  dxSign = [1, -1, -1, 1];
+  dySign = [1, 1, -1, -1];
+  for(var index = 0; index < dxSign.length; index++) {
+    var newDx = (Math.random())*5*dxSign[index];
+    var newDy = (Math.random())*5*dxSign[index];
+    var a = {
+      rot:Math.random()*2*Math.PI,
+      scale:5+Math.random()*15, 
+      dx:newDx,
+      dy:newDy,
+      drot:(Math.random()-0.5)*0.2,
+      vertices:asteroidVertices,
+      parent:false,
+      x:parentX+newDx,
+      y:parentY+newDy
+    }
+    asteroids.push(a);
+  }
+}
+
+function deleteAsteroid(index){
+  asteroids.splice(index, 1);
+}
+
+
+</script>
+</head>
+
+<body onload="init();">
+<center>
+<canvas id="canvas" width="600" height="600"></canvas>
+
+</body>
+</html>
