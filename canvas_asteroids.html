@@ -424,8 +424,6 @@ function reset(){
   //reset level
   document.getElementById("level").innerHTML = level;
 
-  //reset score
-  score = 0;
   updateScore();
 }
 
@@ -458,6 +456,7 @@ function playerDeath(){
   gameLoopRunning = false;
   explosionParticles(spaceship.x, spaceship.y);
   spaceShipAlive = false;
+  score = 0;
   window.setTimeout(() => {
     level = 1;
     reset();
