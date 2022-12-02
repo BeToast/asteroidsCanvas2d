@@ -7,11 +7,16 @@ var asteroidVertices = [];
 var asteroids = [];
 var spaceshipVertices = [];
 var spaceship;
+var spaceShipAlive = true;
 var bullets = [];
+var alienBullets = [];
 var bulletVertices = [];
+var alienBulletVertices = [];
 var bulletReady = true;
 var aliens = [];
-var aliensAlive = false;
+var aleinVerticies = [];
+var particles = [];
+var particleVertices = [];
 
 var level;
 var lives;
@@ -20,14 +25,16 @@ var playerVulnerable = true;
 var secondsTillAlien;
 const alienCountdownInterval = setInterval(countdownAlienTimer, 1000);
 var alienTimerColour = true;
-
 var tempAsteroid;
-
+var tempAlien;
 var gameLoopRunning;
+var toggleFrame = true;
 
 function init() {
+  document.body.style.transition = "background-color 1s linear"; //for flash on player damage...
+
 	canvas = document.getElementById("canvas");
-	ctx = canvas.getContext("2d");	
+	ctx = canvas.getContext("2d");
 
 	asteroidVertices.push({x:-1, y:2});
 	asteroidVertices.push({x:3, y:1});
@@ -42,6 +49,20 @@ function init() {
 
   bulletVertices.push({x:0, y:0});
   bulletVertices.push({x:0, y:1});
+
+  alienBulletVertices.push({x:-1, y:3});
+  alienBulletVertices.push({x:1, y:3});
+  alienBulletVertices.push({x:1, y:-3});
+  alienBulletVertices.push({x:-1, y:-3});
+
+  aleinVerticies.push({x:0, y:1});
+  aleinVerticies.push({x:1, y:1});
+  aleinVerticies.push({x:1, y:2});
+  aleinVerticies.push({x:2, y:0});
+  aleinVerticies.push({x:0, y:-1});
+  aleinVerticies.push({x:-2, y:0});
+  aleinVerticies.push({x:-1, y:2});
+  aleinVerticies.push({x:-1, y:1});
 
 	setKeyHandlers();
 
@@ -77,32 +98,18 @@ function setKeyHandlers() {
 }
 
 function spawnAsteroids() {
-	for (var i=0; i<1; i++) {
-		// var a = {
-    //   x:Math.random()*600,
-    //   y:Math.random()*600,
-    //   rot:Math.random()*2*Math.PI, 
-    //   scale:5+Math.random()*15, 
-    //   dx:(Math.random()-0.5)*10,
-    //   dy:(Math.random()-0.5)*10,
-    //   drot:(Math.random()-0.5)*0.2,
-    //   vertices:asteroidVertices,
-    //   parent:true
-    // };
-
-    //cheeky
-    var a = {
-      x:300,
-      y:390,
-      rot:0, 
-      scale:13, 
-      dx:0,
-      dy:0,
-      drot:0,
+	for (var i=0; i<level*2+1; i++) {
+		var a = {
+      x:Math.random()*600,
+      y:Math.random()*600,
+      rot:Math.random()*2*Math.PI, 
+      scale:10+Math.random()*13, 
+      dx:(Math.random()-0.5)*10,
+      dy:(Math.random()-0.5)*10,
+      drot:(Math.random()-0.5)*0.2,
       vertices:asteroidVertices,
       parent:true
     };
-    
 		asteroids.push(a);
 	}
 }
@@ -111,39 +118,69 @@ function spawnSpaceship() {
 	spaceship = {x:300, y:300, rot:0, scale:10, dx:0, dy:0, drot:0, vertices:spaceshipVertices, thrust:false};
 }
 
+function spawnParticle(spawnX, spawnY){
+	var a = {x:spawnX, y:spawnY, rot:0, scale:5, dx:(Math.random()-0.5)*0.7, dy:(Math.random()-0.5)*0.7, drot:0};
+  particles.push(a);
+}
+
+function spawnAlien(spawnX, spawnY, spawnRot, spawnDX){
+	var a = {x:spawnX, y:spawnY, rot:spawnRot, scale:15, dx:spawnDX, dy:0, drot:0, vertices:aleinVerticies};
+  aliens.push(a);
+}
+
 function gameLoop() {
-  if(gameLoopRunning){
-    window.setTimeout(gameLoop, 1000/30);
+  window.setTimeout(gameLoop, 1000/30);
 
-    ctx.fillStyle = "rgb(190,190,190)";
-    ctx.fillRect (0, 0, 600, 600);
+  ctx.fillStyle = "rgb(190,190,190)";
+  ctx.fillRect (0, 0, 600, 600);
 
-    checkForCollisions();
+  checkForCollisions();
 
-    for (var i=0; i<asteroids.length; i++) {
-      updateObject(asteroids[i]);	
-      drawObject(asteroids[i]);
+  ctx.fillStyle = "#706868";
+  for (var i=0; i<asteroids.length; i++) {
+    updateObject(asteroids[i]);	
+    drawObject(asteroids[i]);
+  }
+
+  ctx.fillStyle = "#000000";
+  for (var i=0; i<bullets.length; i++) {
+    updateObject(bullets[i]);	
+    drawObject(bullets[i]);
+  }
+
+  ctx.fillStyle = "#86a689";
+  for (var i=0; i<aliens.length; i++) {
+    aliens[i].rot = Math.atan2(spaceship.y-aliens[i].y, spaceship.x-aliens[i].x)-Math.PI/2;
+    updateObject(aliens[i]);
+    drawObject(aliens[i]);
+    if(Math.random()<.01){
+      shootAlienBullet(aliens[i]);
     }
+  }
 
-    for (var i=0; i<bullets.length; i++) {
-      updateObject(bullets[i]);	
-      drawObject(bullets[i]);
-    }
+  ctx.fillStyle = "#e33939";
+  for (var i=0; i<particles.length; i++) {
+    updateObject(particles[i]);	
+    drawParticle(particles[i]);
+  }
 
-    for (var i=0; i<aliens.length; i++) {
-      updateObject(aliens[i]);	
-      drawObject(aliens[i]);
-    }
-
+  if(spaceShipAlive) {
     if (spaceship.thrust) {
       spaceship.dx -= Math.sin(spaceship.rot);
       spaceship.dy += Math.cos(spaceship.rot);
     }
+    ctx.fillStyle = "#a45ee6";
     updateObject(spaceship);
     drawObject(spaceship);
-
-    updateScore();
   }
+
+  ctx.fillStyle = "#86a689";
+  for (var i=0; i<alienBullets.length; i++) {
+    updateObject(alienBullets[i]);
+    drawObject(alienBullets[i]);
+  }
+
+  updateScore();
 }
 
 function updateObject(o) {
@@ -169,10 +206,14 @@ function drawObject(o) {
 		var pt2 = getTransformedVertex(o.vertices[i], o); 
 		ctx.lineTo(pt2.x, pt2.y);
 	}
-
 	ctx.lineTo(pt.x, pt.y);
-
+  ctx.fill();
 	ctx.stroke();	
+}
+
+function drawParticle(o){
+  ctx.fillRect(o.x,o.y,o.scale,o.scale);
+  console.log("drawParticle complete");
 }
 
 function getTransformedVertex(vertex, object) {
@@ -192,7 +233,7 @@ function getTransformedVertex(vertex, object) {
 //BEING MY CODE::
 
 function shootBullet() {
-  var spaceShipTip = getTransformedVertex(spaceship.vertices[0], spaceship)
+  var spaceShipTip = getTransformedVertex(spaceship.vertices[0], spaceship);
   sinSpaceShipRotation = Math.sin(spaceship.rot);
   cosSpaceShipRotation = Math.cos(spaceship.rot);
   bullet = {
@@ -208,34 +249,79 @@ function shootBullet() {
   bullets.push(bullet);
 }
 
+function shootAlienBullet(alien){
+  var alienTip = getTransformedVertex(alien.vertices[0], alien);
+  sinAlienRotation = Math.sin(alien.rot);
+  cosAlienRotation = Math.cos(alien.rot);
+  var b = {
+    x:alienTip.x, //start bullet slightly in front of ship to avoid collision.
+    y:alienTip.y, 
+    rot:alien.rot,
+    scale:2,
+    dx:sinAlienRotation*-3, 
+    dy:cosAlienRotation*3,
+    drot:0, 
+    vertices:alienBulletVertices
+  };
+  alienBullets.push(b);
+}
+
 function checkForCollisions(){
   //bullet hit spaceship?
-  for(var bulIndex = 0; bulIndex < bullets.length; bulIndex++) {
-    if(isCollision(bullets[bulIndex], spaceship)){
-      deleteBullet(bulIndex);
-      playerHit()
+  if(spaceShipAlive){
+    for(var bulIndex = 0; bulIndex < bullets.length; bulIndex++) {
+      if(isCollision(bullets[bulIndex], spaceship)){
+        deleteBullet(bulIndex);
+        playerHit()
+      }
+    }
+
+    for(var bulIndex = 0; bulIndex < alienBullets.length; bulIndex++) {
+      if(isCollision(alienBullets[bulIndex], spaceship)){
+        deleteAlienBullet(bulIndex);;
+        playerHit()
+      }
     }
   }
   //spaceship inside asteroid?
   for(var astIndex = 0; astIndex < asteroids.length; astIndex++) {
-    tempAsteroid = asteroids[astIndex];
-    if(isCollision(spaceship, tempAsteroid)){
-      playerHit();
+    if(spaceShipAlive){
+      tempAsteroid = asteroids[astIndex];
+      if(isCollision(spaceship, tempAsteroid)){
+        playerHit();
+      }
     }
     //are any bullets inside asteroid?
     for(var bulIndex = 0; bulIndex < bullets.length; bulIndex++) {
       if(isCollision(bullets[bulIndex], tempAsteroid)){
         deleteBullet(bulIndex);
-        deleteAsteroid(astIndex);
         if(tempAsteroid.parent) {
           score += 10; //10 for parent
           spawnFourAsteroids(tempAsteroid.x, tempAsteroid.y);
         }else{
           score += 5; //5 for baby
         }
+        deleteAsteroid(astIndex);
+      }
+    }
+
+    for(var bulIndex = 0; bulIndex < alienBullets.length; bulIndex++) {
+      if(isCollision(alienBullets[bulIndex], tempAsteroid)){
+        deleteAlienBullet(bulIndex);
+        if(tempAsteroid.parent) {
+          score += 10; //10 for parent
+          spawnFourAsteroids(tempAsteroid.x, tempAsteroid.y);
+        }else{
+          score += 5; //5 for baby
+        }
+        deleteAsteroid(astIndex);
       }
     }
   }
+}
+
+function asteroidHit(){
+  
 }
 
 //using point-inside-polygon collision detection
@@ -299,24 +385,35 @@ function spawnFourAsteroids(parentX, parentY) {
 
 function deleteAsteroid(index){
   asteroids.splice(index, 1);
+  if(asteroids.length==0){
+    levelComplete(); //if no more asteroids, then next level.
+  }
 }
 
 function deleteBullet(index){
   bullets.splice(index, 1);
 }
 
+function deleteAlienBullet(index){
+  alienBullets.splice(index, 1);
+}
+
 function startLevel(){
   spawnAsteroids(level);
 	spawnSpaceship();
-  secondsTillAlien = 120; //2 minutes to complete level.
+  secondsTillAlien = 90; //1.5 minutes to complete level.
+  playerVulnerable = false;
+  window.setTimeout(() => {playerVulnerable=true;}, 2000);
   gameLoopRunning = true;
 }
 
 function reset(){
-  aliensAlive = false;
-  spaceship = undefined;
+  spaceShipAlive = true;
   asteroids.length = 0;
   bullets.length = 0;
+  alienBullets.length = 0;
+  particles.length = 0;
+  aliens.length = 0;
   
   lives = 3;
   //reset lives
@@ -325,8 +422,7 @@ function reset(){
   }
 
   //reset level
-  level = 1;
-  document.getElementById("level").innerHTML = "1";
+  document.getElementById("level").innerHTML = level;
 
   //reset score
   score = 0;
@@ -343,6 +439,7 @@ function levelComplete(){
 function playerHit(){
   if(playerVulnerable){
     playerVulnerable = false;
+    hitBackground();
     window.setTimeout(() => {playerVulnerable=true;}, 1500);
     document.getElementById("life"+lives).innerHTML = "";
     lives -= 1;
@@ -352,12 +449,27 @@ function playerHit(){
   }
 }
 
+function hitBackground(){
+  document.body.style.backgroundColor = "#ff0000";
+  window.setTimeout(() => {document.body.style.backgroundColor = "#ffffff"}, 100);
+}
+
 function playerDeath(){
   gameLoopRunning = false;
-  //play exposion animation
-  //delay things for 3 seconds.
-  reset();
-  startLevel();
+  explosionParticles(spaceship.x, spaceship.y);
+  spaceShipAlive = false;
+  window.setTimeout(() => {
+    level = 1;
+    reset();
+    startLevel();
+  }, 3000);
+}
+
+function explosionParticles(spawnX, spawnY){
+  var numParticles = 40
+  for(var i = 0; i < numParticles; i++){
+    spawnParticle(spawnX, spawnY);
+  }
 }
 
 function updateScore(){
@@ -366,12 +478,13 @@ function updateScore(){
 
 
 function spawnAliens(){
-  aliensAlive = true;
-  console.log("Spawning aliens...!!!!!!!");
+  console.log("Spawning");
+  spawnAlien(0, 50, 0, 1);
+  spawnAlien(600, 550, Math.PI, -1);
 }
 
 function countdownAlienTimer(){
-  if(gameLoopRunning && !aliensAlive){
+  if(gameLoopRunning && aliens.length==0){
     secondsTillAlien--;
     if(secondsTillAlien == 0){
       spawnAliens();
